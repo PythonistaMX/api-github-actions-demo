@@ -1,4 +1,4 @@
-FROM python
+FROM python:3.10.0a7-alpine3.13
 RUN mkdir /demo
 RUN pip install --upgrade pip
 RUN pip install virtualenv
