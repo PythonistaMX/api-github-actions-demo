@@ -1,0 +1,88 @@
+## Azure Pipelines YAML based on .guthib/workflows.empaqueta.yaml
+## https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=schema%2Cparameter-schema
+## Trigger on push to main branch  and pull request to main branch
+
+trigger:
+  pull_request:
+    branches:
+    - main
+  push:
+    branches:
+    - main
+  paths:
+    include:
+    - 'src/**'
+    - 'tests/**'
+    - 'requirements.txt'
+    - 'Dockerfile'
+    - 'pyproject.toml'
+    - 'tox.ini'
+    - '.github/workflows/empaqueta.yaml'
+    - 'pipelines.yaml'
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.8'
+    addToPath: true
+    architecture: 'x64'
+
+- script: |
+    python -m pip install --upgrade pip
+    pip install -r requirements.txt
+  displayName: 'Install dependencies'
+
+- script: |
+    python -m pytest --junitxml=junit/test-results.xml \
+    --cov=src --cov-report=xml --cov-report=html --cov-report=term-missing
+  displayName: 'Run tests'
+
+- script: |
+    python -m pylint src
+  displayName: 'Run pylint'
+
+- script: |
+    python -m mypy src
+  displayName: 'Run mypy'
+  
+- script: |
+    python -m tox
+  displayName: 'Run tox'
+
+  # Docker login
+- task: Docker@2
+  inputs:
+    containerRegistry: ${{ variables.containerRegistry }}
+    repository: ${{ variables.imageRepository }}
+    command: 'login'
+
+# Create a docker image
+- task: Docker@2
+  inputs:
+    containerRegistry: ${{ variables.containerRegistry }}
+    repository: ${{ variables.imageRepository }}
+    command: 'buildAndPush'
+    Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+    tags: |
+      ${{ variables.imageTag }}
+      latest
+
+#Publish the image as an artifact
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(Build.SourcesDirectory)/Dockerfile'
+    artifact: 'dockerfile'
+
+# Deploy to Azure Web App using the Docker image
+- task: AzureWebAppContainer@1
+  inputs:
+    azureSubscription: ${{ variables.azureSubscription }}
+    appName: ${{ variables.appName }}
+    imageName: ${{ variables.imageRepository }}:${{ variables.imageTag }}
+    containerCommand: run
+    #containerRegistryType: 'Azure Container Registry'
+    #runOptions: '-p 8080:80'
+    #startUpCommand: 'python app.py'

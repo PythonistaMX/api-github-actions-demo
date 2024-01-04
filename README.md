@@ -1,2 +1,1 @@
-# api-testing-demo
-Proyecto complementario de demostración de pruebas con Flask y FastAPI
+# Aplicación de demostración de una API simple basada en APiFlask

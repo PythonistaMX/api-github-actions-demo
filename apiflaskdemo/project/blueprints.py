@@ -32,13 +32,13 @@ def elimina_alumno(cuenta):
 @abc_alumnos.post("/alumno/<int:cuenta>")
 @abc_alumnos.output(AlumnoSchema, status_code=201)
 @abc_alumnos.input(AlumnoInSchema)
-def crea_alumno(cuenta, data):
+def crea_alumno(cuenta, json_data):
     '''Método para crear un alumno en particular'''
     if Alumno.query.filter_by(cuenta=cuenta).first():
         abort(409)
     else:
-        data["cuenta"] = cuenta
-        alumno = Alumno(**AlumnoSchema().load(data))
+        json_data["cuenta"] = cuenta
+        alumno = Alumno(**AlumnoSchema().load(json_data))
         db.session.add(alumno)
         db.session.commit()
         return alumno, 201
@@ -46,11 +46,11 @@ def crea_alumno(cuenta, data):
 @abc_alumnos.put("/alumno/<int:cuenta>")
 @abc_alumnos.output(AlumnoSchema)
 @abc_alumnos.input(AlumnoInSchema)
-def sustituye_alumno(cuenta, data):
+def sustituye_alumno(cuenta, json_data):
     alumno = Alumno.query.get_or_404(cuenta)
     db.session.delete(alumno)
-    data["cuenta"] = cuenta
-    nuevo_alumno = Alumno(**data)
+    json_data["cuenta"] = cuenta
+    nuevo_alumno = Alumno(**json_data)
     db.session.add(nuevo_alumno)
     db.session.commit()
     return  nuevo_alumno
