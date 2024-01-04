@@ -1,4 +1,4 @@
-FROM python
+FROM bitnami/python:latest
 RUN mkdir /demo
 RUN pip install --upgrade pip
 RUN pip install virtualenv
