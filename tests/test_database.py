@@ -1,9 +1,14 @@
 """Tests para la base de datos de la aplicación."""
 import pytest
+import os
 from apiflaskdemo import create_app
 from apiflaskdemo.project.models import Alumno, User
 from apiflaskdemo.project.schemas import AlumnoSchema
 from data.alumnos import data_alumnos
+
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("APP_TESTING", "1")
+os.environ.setdefault("APP_SEED_DATA", "1")
 
 
 app = create_app()

@@ -11,13 +11,20 @@ permissions:
 
 jobs:
   build_artifact:
-
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: dev
+    env:
+      # Variables/secretos inyectados por entorno de GitHub Actions.
+      APP_ENV: dev
+      DATABASE_URL: ${{ vars.DATABASE_URL }}
+      APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+      APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v6
       with:
         python-version: "3.10"
     - name: Install dependencies
@@ -34,7 +41,8 @@ jobs:
         cp $GITHUB_WORKSPACE/.tox/.pkg/dist/*.tar.gz $GITHUB_WORKSPACE/paquete/
         ls $GITHUB_WORKSPACE/paquete/
     - name: Use the Upload Artifact GitHub Action
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with: 
         name: assets-for-download
         path: paquete
+        if-no-files-found: error

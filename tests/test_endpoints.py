@@ -1,9 +1,14 @@
 import pytest
+import os
 from app import create_app
 from apiflaskdemo.project.models import db, Alumno
 from apiflaskdemo.project.schemas import AlumnoSchema
 from flask import Request
 from data.alumnos import data_alumnos
+
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("APP_TESTING", "1")
+os.environ.setdefault("APP_SEED_DATA", "1")
 
 app = create_app()
 

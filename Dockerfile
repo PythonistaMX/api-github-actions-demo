@@ -1,17 +1,26 @@
-FROM python:latest
-RUN mkdir /demo
-RUN pip install --upgrade pip
-RUN pip install virtualenv
-RUN virtualenv /demo/venv
-RUN . /demo/venv/bin/activate
-COPY requirements.txt /demo/
-COPY app.py /demo/
-RUN pip install -r /demo/requirements.txt
-ADD ./apiflaskdemo /demo/apiflaskdemo
-ADD ./data /demo/data
-ENV FLASK_APP=/demo/app.py
+FROM python:3.11-slim
+
+# Reduce artefactos innecesarios y mejora observabilidad en logs.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+	PYTHONUNBUFFERED=1 \
+	FLASK_APP=app.py
+
+WORKDIR /demo
+
+COPY requirements.txt ./
+RUN python -m pip install --upgrade pip \
+	&& pip install --no-cache-dir -r requirements.txt
+
+COPY app.py ./
+COPY apiflaskdemo ./apiflaskdemo
+COPY data ./data
+
+RUN addgroup --system app && adduser --system --ingroup app app \
+	&& chown -R app:app /demo
+
+# Evita ejecutar la app como root dentro del contenedor.
+USER app
+
 EXPOSE 8080
-RUN echo "#!/bin/bash\n. /demo/venv/bin/activate\nexport FLASK_APP=app.py\n/usr/local/bin/flask run -h 0.0.0.0 -p 8080\n" > /usr/bin/start.sh
-RUN chmod +x /usr/bin/start.sh
-WORKDIR /demo/
-CMD /usr/bin/start.sh
+
+CMD ["flask", "run", "-h", "0.0.0.0", "-p", "8080"]

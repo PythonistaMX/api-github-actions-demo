@@ -2,14 +2,48 @@ name: Publish Docker image
 
 on:
   workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Entorno destino (test o prod)"
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - prod
+
+permissions:
+  # Minimo alcance para este flujo de publicacion.
+  contents: read
 
 jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.target_environment }}
+    env:
+      # Variables/secretos inyectados por entorno de GitHub Actions.
+      APP_ENV: ${{ inputs.target_environment }}
+      DATABASE_URL: ${{ vars.DATABASE_URL }}
+      APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+      APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+
+      - name: Lint Dockerfile
+        # Falla temprano por malas practicas del Dockerfile.
+        run: docker run --rm -i hadolint/hadolint < Dockerfile
+
+      - name: Trivy config scan
+        # Bloquea el publish ante hallazgos de alta severidad.
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          hide-progress: true
+          severity: HIGH,CRITICAL
+          exit-code: '1'
       
       - name: Log in to Docker Hub
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
@@ -22,6 +56,11 @@ jobs:
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: josechval/apiflask-demo
+          tags: |
+            # Tag inmutable por commit para trazabilidad.
+            type=sha
+            # latest solo en rama por defecto para evitar ambiguedad.
+            type=raw,value=latest,enable={{is_default_branch}}
       
       - name: Build and push Docker image
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4

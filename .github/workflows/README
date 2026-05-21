@@ -1,0 +1,26 @@
+Workflows del proyecto y requisitos de entornos en GitHub Actions
+
+Entornos esperados:
+
+- dev
+- test
+- prod
+
+Variables por entorno (vars):
+
+- DATABASE_URL
+- GCP_PROJECT_ID (prod)
+- GCP_REGION (prod)
+- GCP_WORKLOAD_IDENTITY_PROVIDER (prod)
+- GCP_SERVICE_ACCOUNT (prod)
+
+Secretos por entorno (secrets):
+
+- APP_SECRET_KEY
+- APP_SECURITY_PASSWORD_SALT
+
+Notas de hardening:
+
+- Usar `environment` en cada job para aislar configuración por entorno.
+- Usar OIDC para GCP (`permissions: id-token: write`) en lugar de llaves estáticas.
+- Mantener gates de seguridad antes de publicar imágenes (Hadolint + Trivy).

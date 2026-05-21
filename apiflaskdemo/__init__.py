@@ -1,4 +1,6 @@
 from apiflask import APIFlask
+import os
+
 from apiflaskdemo.project.models import db, Alumno, User
 from apiflaskdemo.project.blueprints import abc_alumnos
 from apiflaskdemo.project.auth.blueprints import auth_bp
@@ -16,7 +18,8 @@ def create_app():
     # Se incializa la conexión entre SQLALchemy y la base de datos
     db.init_app(app) 
     
-    if app.config["TESTING"]:
+    seed_on_start = os.getenv("APP_SEED_DATA", "0") == "1"
+    if app.config["TESTING"] or seed_on_start:
         with app.app_context():
             # Elimina la base de datos si existe
             db.drop_all()
