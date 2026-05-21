@@ -22,7 +22,8 @@ SECURITY_PASSWORD_SALT = os.getenv("APP_SECURITY_PASSWORD_SALT", "dev-insecure-s
 
 def _default_database_uri() -> str:
     if ENV == "prod":
-        return "postgresql://postgres:postgres@localhost:5432/postgres"
+        # En produccion no debe existir fallback implicito de credenciales.
+        return ""
     if ENV == "test":
         return "sqlite:///test.sqlite3"
     return "sqlite:///db.sqlite3"
@@ -35,3 +36,11 @@ if _database_url.startswith("postgres://"):
 
 SQLALCHEMY_DATABASE_URI = _database_url
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+if ENV == "prod":
+    if not SQLALCHEMY_DATABASE_URI:
+        raise RuntimeError("DATABASE_URL es obligatoria cuando APP_ENV=prod")
+    if SECRET_KEY == "dev-insecure-secret-change-me":
+        raise RuntimeError("APP_SECRET_KEY debe definirse en prod")
+    if SECURITY_PASSWORD_SALT == "dev-insecure-salt-change-me":
+        raise RuntimeError("APP_SECURITY_PASSWORD_SALT debe definirse en prod")

@@ -6,3 +6,4 @@ pytest
 tox
 coverage
 Flask-SQLAlchemy
+gunicorn

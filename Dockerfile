@@ -23,4 +23,4 @@ USER app
 
 EXPOSE 8080
 
-CMD ["flask", "run", "-h", "0.0.0.0", "-p", "8080"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]

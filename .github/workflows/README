@@ -24,3 +24,10 @@ Notas de hardening:
 - Usar `environment` en cada job para aislar configuración por entorno.
 - Usar OIDC para GCP (`permissions: id-token: write`) en lugar de llaves estáticas.
 - Mantener gates de seguridad antes de publicar imágenes (Hadolint + Trivy).
+
+Cierre recomendado contra poisoning de GitHub Actions:
+
+- Habilitar en el repositorio la política de Actions con allowlist de acciones confiables.
+- Exigir revisión de cambios en `.github/workflows/**` mediante branch protection.
+- Mantener pinning por SHA en acciones de terceros y renovar con Dependabot.
+- Proteger `prod` con aprobaciones manuales y ramas permitidas.

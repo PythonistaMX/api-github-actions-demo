@@ -15,6 +15,7 @@ on:
 permissions:
   # Minimo alcance para este flujo de publicacion.
   contents: read
+  id-token: write
 
 jobs:
   push_to_registry:
@@ -63,9 +64,60 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
       
       - name: Build and push Docker image
+        id: build_and_push
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0.15.0
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Build immutable image reference
+        run: echo "IMAGE_REF=josechval/apiflask-demo@${{ steps.build_and_push.outputs.digest }}" >> "$GITHUB_ENV"
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_REF }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Generate SBOM (SPDX)
+        run: syft "$IMAGE_REF" -o spdx-json=sbom.spdx.json
+
+      - name: Sign image (keyless with OIDC)
+        run: cosign sign --yes "$IMAGE_REF"
+
+      - name: Attach SBOM attestation
+        run: |
+          cosign attest --yes \
+            --predicate sbom.spdx.json \
+            --type spdxjson \
+            "$IMAGE_REF"
+
+      - name: Verify signature and attestation
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "https://github.com/.+" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$IMAGE_REF"
+          cosign verify-attestation \
+            --type spdxjson \
+            --certificate-identity-regexp "https://github.com/.+" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$IMAGE_REF"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-dockerhub-${{ github.sha }}
+          path: sbom.spdx.json
+          if-no-files-found: error
