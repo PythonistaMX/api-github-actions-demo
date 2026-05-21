@@ -1,9 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask_login.mixins import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
-class Alumno(UserMixin, db.Model):
+class Alumno(db.Model):
     __tablename__ = 'alumnos'
     cuenta = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(50))
@@ -14,11 +14,16 @@ class Alumno(UserMixin, db.Model):
     promedio = db.Column(db.Float)
     al_corriente = db.Column(db.Boolean)
 
-class User(UserMixin, db.Model):
+class User(db.Model):
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email = db.Column(db.String(255), nullable=False, unique=True)
-    username= db.Column(db.String(25), nullable=False, unique=True)
+    username = db.Column(db.String(25), nullable=False, unique=True)
     password = db.Column(db.String(255))
     active = db.Column(db.Boolean())
-    authenticated = db.Column(db.Boolean())
+
+    def set_password(self, password: str) -> None:
+        self.password = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return check_password_hash(self.password, password)

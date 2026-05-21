@@ -26,7 +26,7 @@ def base_conectada() -> None:
 def test_existe_admin(base_conectada) -> None:
     """Test que comprueba que existe el usuario admin"""
     print("Probando si existe el usuario 'admin...'")
-    assert User.query.filter_by(username="admin")
+    assert User.query.filter_by(username="admin").first() is not None
     print("Usuario 'admin' existe.")
 
 

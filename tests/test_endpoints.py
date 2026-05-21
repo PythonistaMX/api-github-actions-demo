@@ -1,7 +1,7 @@
 import pytest
 import os
 from app import create_app
-from apiflaskdemo.project.models import db, Alumno
+from apiflaskdemo.project.models import db, Alumno, User
 from apiflaskdemo.project.schemas import AlumnoSchema
 from flask import Request
 from data.alumnos import data_alumnos
@@ -11,6 +11,21 @@ os.environ.setdefault("APP_TESTING", "1")
 os.environ.setdefault("APP_SEED_DATA", "1")
 
 app = create_app()
+
+@pytest.fixture(autouse=True)
+def reset_db():
+    """Reinicia la base de datos antes de cada test para garantizar independencia."""
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+        for alumno in data_alumnos:
+            db.session.add(Alumno(**alumno))
+        admin = User(username='admin', email='example@example.com', active=True)
+        admin.set_password('admin')
+        db.session.add(admin)
+        db.session.commit()
+    yield
+
 
 @pytest.fixture
 def client() -> Request:
@@ -92,8 +107,8 @@ def test_post_cuenta_duplicada(client):
         "promedio": 9.0,
         "al_corriente": True
     }
-    r = client.post('/api/alumno/1234567', json=alumno)
-    print("Validando que se pueda crear un alumno...")
+    r = client.post('/api/alumno/1231221', json=alumno)
+    print("Validando que no se pueda crear un alumno con cuenta duplicada...")
     assert r.status_code == 409
 
 def test_put_alumno(client) -> None:
@@ -107,13 +122,13 @@ def test_put_alumno(client) -> None:
         "promedio": 9.0,
         "al_corriente": True
     }
-    r = client.put('/api/alumno/1234567', json=alumno)
+    r = client.put('/api/alumno/1231224', json=alumno)
     print("Validando que se pueda actualizar un alumno...")
     assert r.status_code == 200
     print("Se puede actualizar un alumno.")
     print("Validando que los datos del alumno actualizado sean correctos...")
     alumno_response = AlumnoSchema().dump(r.json)
-    alumno["cuenta"] = 1234567
+    alumno["cuenta"] = 1231224
     assert alumno_response == alumno
     print("Datos del alumno actualizado son correctos.")
 

@@ -4,7 +4,6 @@ import os
 from apiflaskdemo.project.models import db, Alumno, User
 from apiflaskdemo.project.blueprints import abc_alumnos
 from apiflaskdemo.project.auth.blueprints import auth_bp
-from sqlalchemy import inspect
 from data.alumnos import data_alumnos as alumnos
 
 def create_app():
@@ -32,11 +31,9 @@ def create_app():
                 
             # Verifica que exista el usuario admin y lo crea si no es así 
             if not User.query.filter_by(username="admin").first():
-                user = User(username='admin',
-                           email='example@example.com',
-                           password='admin', 
-                           active=True)
-                db.session.add(user)
+                admin = User(username='admin', email='example@example.com', active=True)
+                admin.set_password('admin')
+                db.session.add(admin)
                 db.session.commit()
                 
     # Registra los blueprints con los endpoints

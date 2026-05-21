@@ -19,7 +19,7 @@ def user_checkout():
 @auth_bp.input(LoginSchema)
 def login(json_data):
     user = User.query.filter_by(username=json_data["username"]).one_or_none()
-    if user and user.password == json_data["password"]:
+    if user and user.check_password(json_data["password"]):
         session.clear()
         session["user_id"] = user.id
         return {'msg': 'logged in'}
