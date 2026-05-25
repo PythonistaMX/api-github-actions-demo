@@ -6,8 +6,8 @@
 |---|---|---|
 | `python-app-test.yml` | `push main`, `pull_request`, manual | Quality gates (ruff, mypy, pytest-cov, Trivy fs) en matriz Python 3.11/3.12/3.13 |
 | `empaqueta.yaml` | Manual | Quality gates → empaquetado con tox → artefacto `.tar.gz` |
-| `envia-a-docker.yaml` | Tag `v*.*.*`, manual | Publica imagen en Docker Hub con SBOM, firma Cosign y Trivy |
-| `envia-a-packages.yml` | Tag `v*.*.*`, manual | Publica imagen en GHCR con SBOM, firma Cosign y Trivy |
+| `envia-a-docker.yaml` | Tag `v*.*.*`, manual | Publica imagen en Docker Hub; Trivy, firma Cosign y SBOM en todos los entornos; verificación de firma y attestation solo en `prod` (timeout 2 min) |
+| `envia-a-packages.yml` | Tag `v*.*.*`, manual | Publica imagen en GHCR; Trivy, firma Cosign y SBOM en todos los entornos; verificación de firma y attestation solo en `prod` (timeout 2 min) |
 | `despliega-cloud-run.yaml` | Tag `v*.*.*`, manual | Despliega en Cloud Run vía OIDC; smoke test + rollback automático |
 
 ### Quality gates
@@ -31,6 +31,19 @@ trivy fs (SARIF → GitHub Security)   # vulnerabilidades en dependencias
 
 Los resultados de pytest (JUnit XML) y la cobertura (XML) se suben como
 artefactos del workflow aunque el pipeline falle, para facilitar el diagnóstico.
+
+## Imagen Docker
+
+La imagen de producción se construye desde `python:3.11-slim` e instala
+únicamente las dependencias declaradas en `requirements.runtime.txt`
+(5 paquetes: apiflask, email-validator, bcrypt, Flask-SQLAlchemy, gunicorn)
+usando `uv pip install --system`. Las dependencias de desarrollo (pytest,
+mypy, ruff, etc.) no se incluyen, lo que reduce significativamente la
+superficie de vulnerabilidades detectadas por Trivy en el escaneo de imagen.
+
+El binario de `uv` se copia desde la imagen oficial `ghcr.io/astral-sh/uv`
+(versión fijada en el Dockerfile) como etapa previa, sin añadir capas de
+instalación adicionales.
 
 ## Política de tags y releases
 
@@ -168,6 +181,12 @@ terraform -chdir=infra/terraform-py271 apply
 |---|---|
 | `APP_SECRET_KEY` | Clave secreta de Flask — inyectada en Cloud Run via `--update-secrets` |
 | `APP_SECURITY_PASSWORD_SALT` | Salt para hashing de contraseñas — inyectada en Cloud Run via `--update-secrets` |
+
+> **Verificación cosign en `prod`:** los steps `cosign verify` y
+> `cosign verify-attestation` consultan Rekor (el log de transparencia de
+> Sigstore) y solo se ejecutan en este entorno, justo antes del despliegue.
+> Ambos steps tienen `timeout-minutes: 3` y `--timeout 2m` para evitar
+> cuelgues si Rekor experimenta latencia alta.
 
 > No guardes JSON keys de service accounts en Secrets. La autenticación con GCP
 > se hace vía OIDC Workload Identity Federation; los workflows ya incluyen
