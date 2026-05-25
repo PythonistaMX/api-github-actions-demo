@@ -63,10 +63,12 @@ jobs:
         run: docker run --rm -i hadolint/hadolint:v2.12.0 < Dockerfile
 
       - name: Trivy config scan
-        # Bloquea el publish ante hallazgos de alta severidad.
+        # Escanea solo el Dockerfile del build para evitar falsos bloqueos por
+        # configuraciones no relacionadas con la imagen a publicar.
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
+          scan-ref: Dockerfile
           hide-progress: true
           severity: HIGH,CRITICAL
           exit-code: '1'
