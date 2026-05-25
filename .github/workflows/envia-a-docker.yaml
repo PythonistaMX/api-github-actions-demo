@@ -46,9 +46,9 @@ jobs:
     environment: ${{ needs.resolve-env.outputs.target }}
     env:
       APP_ENV: ${{ needs.resolve-env.outputs.target }}
-      DATABASE_URL: ${{ vars.DATABASE_URL }}
-      APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
-      APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
+      DATABASE_URL: ${{ vars['DATABASE_URL'] }}
+      APP_SECRET_KEY: ${{ secrets['APP_SECRET_KEY'] }}
+      APP_SECURITY_PASSWORD_SALT: ${{ secrets['APP_SECURITY_PASSWORD_SALT'] }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v6
@@ -101,12 +101,16 @@ jobs:
         uses: sigstore/cosign-installer@v3.5.0
 
       - name: Build immutable image reference
-        run: echo "IMAGE_REF=josechval/apiflask-demo@${{ steps.build_and_push.outputs.digest }}" >> "$GITHUB_ENV"
+        id: image_ref
+        run: |
+          IMAGE_REF="josechval/apiflask-demo@${{ steps.build_and_push.outputs.digest }}"
+          echo "IMAGE_REF=$IMAGE_REF" >> "$GITHUB_ENV"
+          echo "image_ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ env.IMAGE_REF }}
+          image-ref: ${{ steps.image_ref.outputs.image_ref }}
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true

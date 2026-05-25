@@ -153,4 +153,4 @@ jobs:
           gcloud run services update-traffic ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
             --region "${{ vars.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
-            --to-revisions=${{ env.PREV_REVISION }}=100
+            --to-revisions=${PREV_REVISION}=100

@@ -16,7 +16,8 @@ jobs:
   prueba:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: test
+    environment:
+      name: test
     strategy:
       matrix:
         # Probamos en todas las versiones de Python soportadas por pyproject.toml.
@@ -28,9 +29,9 @@ jobs:
       APP_TESTING: "1"
       # APP_SEED_DATA=1 carga datos iniciales para que los tests de endpoints funcionen.
       APP_SEED_DATA: "1"
-      DATABASE_URL: ${{ vars.DATABASE_URL }}
-      APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
-      APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
+      DATABASE_URL: ${{ vars['DATABASE_URL'] }}
+      APP_SECRET_KEY: ${{ secrets['APP_SECRET_KEY'] }}
+      APP_SECURITY_PASSWORD_SALT: ${{ secrets['APP_SECURITY_PASSWORD_SALT'] }}
 
     steps:
     # Pinning por tag; para hardening máximo reemplazar con SHA:

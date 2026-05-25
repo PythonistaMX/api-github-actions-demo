@@ -12,14 +12,15 @@ jobs:
     # Gate de calidad obligatorio: el empaquetado no inicia si falla.
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: test
+    environment:
+      name: test
     env:
       APP_ENV: test
       APP_TESTING: "1"
       APP_SEED_DATA: "1"
-      DATABASE_URL: ${{ vars.DATABASE_URL }}
-      APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
-      APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
+      DATABASE_URL: ${{ vars['DATABASE_URL'] }}
+      APP_SECRET_KEY: ${{ secrets['APP_SECRET_KEY'] }}
+      APP_SECURITY_PASSWORD_SALT: ${{ secrets['APP_SECURITY_PASSWORD_SALT'] }}
 
     steps:
     - uses: actions/checkout@v6
@@ -50,12 +51,13 @@ jobs:
     needs: calidad
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: dev
+    environment:
+      name: dev
     env:
       APP_ENV: dev
-      DATABASE_URL: ${{ vars.DATABASE_URL }}
-      APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
-      APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
+      DATABASE_URL: ${{ vars['DATABASE_URL'] }}
+      APP_SECRET_KEY: ${{ secrets['APP_SECRET_KEY'] }}
+      APP_SECURITY_PASSWORD_SALT: ${{ secrets['APP_SECURITY_PASSWORD_SALT'] }}
 
     steps:
     - uses: actions/checkout@v6
