@@ -1,8 +1,6 @@
-# Pin por digest SHA: garantiza que el build sea reproducible y que una actualización
-# silenciosa del tag 'slim' no introduzca cambios no auditados en la imagen base.
-# Para actualizar: docker pull python:3.11-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.11-slim
-# Luego reemplaza el digest y actualiza también la entrada en dependabot.yml (ecosystem: docker).
-FROM python:3.11-slim@sha256:ad48727987b259854d52241fac3bc633574364867e5571e796c66bd1be2b0e2b
+# Usamos tag versionado para evitar roturas por digests retirados y mantener
+# una base estable en la rama 3.11.
+FROM python:3.11-slim
 
 # Reduce artefactos innecesarios y mejora observabilidad en logs.
 ENV PYTHONDONTWRITEBYTECODE=1 \
