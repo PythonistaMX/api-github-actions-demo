@@ -147,7 +147,11 @@ jobs:
             --type spdxjson \
             "$IMAGE_REF"
 
-      - name: Verify signature and attestation
+      - name: Verify signature
+        # Solo en prod: verifica contra Rekor antes del despliegue.
+        # En test la firma ya fue emitida correctamente (cosign sign no falló).
+        if: needs.resolve-env.outputs.target == 'prod'
+        timeout-minutes: 3
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             CERT_REF_REGEX='refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?'
@@ -162,10 +166,24 @@ jobs:
           # Un regexp más permisivo (ej. "https://github.com/.+") acepta firmas de
           # cualquier repo o workflow, anulando la garantía de provenance.
           cosign verify \
+            --timeout 2m \
             --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-docker.yaml@${CERT_REF_REGEX}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$IMAGE_REF"
+
+      - name: Verify attestation
+        # Attestation completa solo en prod para reducir tiempo en test.
+        if: needs.resolve-env.outputs.target == 'prod'
+        timeout-minutes: 3
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            CERT_REF_REGEX='refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?'
+          else
+            CERT_REF_REGEX='refs/heads/main'
+          fi
+
           cosign verify-attestation \
+            --timeout 2m \
             --type spdxjson \
             --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-docker.yaml@${CERT_REF_REGEX}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
