@@ -91,8 +91,10 @@ jobs:
         if-no-files-found: error
 
     - name: Escanear dependencias con Trivy (fs)
-      # scan-type: fs analiza el proyecto completo incluyendo uv.lock para detectar
-      # vulnerabilidades conocidas (CVEs) en las dependencias antes de construir la imagen.
+      # if: always() garantiza que el escaneo corre aunque pasos anteriores (ruff, pytest)
+      # fallen: las vulnerabilidades de seguridad deben reportarse independientemente de la
+      # calidad del código. Sin este flag, un fallo de lint dejaría el SARIF sin generar.
+      if: always()
       uses: aquasecurity/trivy-action@v0.36.0
       with:
         scan-type: fs
@@ -102,9 +104,8 @@ jobs:
         output: trivy-fs-results.sarif
 
     - name: Subir resultados de Trivy a GitHub Security
-      # if: always() asegura que los resultados se suban incluso si Trivy encontró CVEs.
       if: always()
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: trivy-fs-results.sarif
         category: trivy-fs-${{ matrix.python-version }}
