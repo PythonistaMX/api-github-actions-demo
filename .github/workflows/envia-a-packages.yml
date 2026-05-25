@@ -115,21 +115,6 @@ jobs:
           echo "IMAGE_REF=$IMAGE_REF" >> "$GITHUB_ENV"
           echo "image_ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
 
-      - name: Esperar propagación de la imagen en GHCR
-        # GHCR puede tardar unos segundos en exponer el digest recién publicado.
-        # Sin esta espera, Trivy puede fallar con "image not found" de forma intermitente.
-        run: |
-          for attempt in {1..10}; do
-            if docker buildx imagetools inspect "$IMAGE_REF" > /dev/null 2>&1; then
-              echo "Imagen disponible en GHCR: $IMAGE_REF"
-              exit 0
-            fi
-            echo "Intento $attempt/10: digest aún no visible, reintentando..."
-            sleep 6
-          done
-          echo "No se pudo resolver la imagen en GHCR: $IMAGE_REF"
-          exit 1
-
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
