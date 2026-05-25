@@ -2,6 +2,9 @@
 # una base estable en la rama 3.11.
 FROM python:3.11-slim
 
+# Instala el binario de uv para gestionar dependencias de forma reproducible.
+COPY --from=ghcr.io/astral-sh/uv:0.7.22 /uv /uvx /bin/
+
 # Reduce artefactos innecesarios y mejora observabilidad en logs.
 ENV PYTHONDONTWRITEBYTECODE=1 \
 	PYTHONUNBUFFERED=1 \
@@ -10,8 +13,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /demo
 
 COPY requirements.runtime.txt ./
-RUN python -m pip install --no-cache-dir --upgrade pip==24.3.1 \
-	&& pip install --no-cache-dir -r requirements.runtime.txt
+RUN uv pip install --system --no-cache --upgrade "setuptools>=80.0.0" "wheel>=0.46.2" \
+	&& uv pip install --system --no-cache -r requirements.runtime.txt
 
 COPY app.py ./
 COPY apiflaskdemo ./apiflaskdemo
