@@ -1,8 +1,9 @@
 """Configuracion de la aplicacion."""
+
 import os
 
 
-def _as_bool(value: str, default: bool = False) -> bool:
+def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
@@ -17,7 +18,9 @@ TESTING = _as_bool(os.getenv("APP_TESTING"), default=False)
 
 # Secretos por entorno via GitHub Actions -> Secrets.
 SECRET_KEY = os.getenv("APP_SECRET_KEY", "dev-insecure-secret-change-me")
-SECURITY_PASSWORD_SALT = os.getenv("APP_SECURITY_PASSWORD_SALT", "dev-insecure-salt-change-me")
+SECURITY_PASSWORD_SALT = os.getenv(
+    "APP_SECURITY_PASSWORD_SALT", "dev-insecure-salt-change-me"
+)
 
 
 def _default_database_uri() -> str:
@@ -40,7 +43,7 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 if ENV == "prod":
     if not SQLALCHEMY_DATABASE_URI:
         raise RuntimeError("DATABASE_URL es obligatoria cuando APP_ENV=prod")
-    if SECRET_KEY == "dev-insecure-secret-change-me":
+    if SECRET_KEY == "dev-insecure-secret-change-me":  # noqa: S105
         raise RuntimeError("APP_SECRET_KEY debe definirse en prod")
-    if SECURITY_PASSWORD_SALT == "dev-insecure-salt-change-me":
+    if SECURITY_PASSWORD_SALT == "dev-insecure-salt-change-me":  # noqa: S105
         raise RuntimeError("APP_SECURITY_PASSWORD_SALT debe definirse en prod")

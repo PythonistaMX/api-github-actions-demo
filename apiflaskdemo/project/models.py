@@ -1,10 +1,11 @@
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
-class Alumno(db.Model):
-    __tablename__ = 'alumnos'
+
+class Alumno(db.Model):  # type: ignore[name-defined]
+    __tablename__ = "alumnos"
     cuenta = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(50))
     primer_apellido = db.Column(db.String(50))
@@ -14,7 +15,8 @@ class Alumno(db.Model):
     promedio = db.Column(db.Float)
     al_corriente = db.Column(db.Boolean)
 
-class User(db.Model):
+
+class User(db.Model):  # type: ignore[name-defined]
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email = db.Column(db.String(255), nullable=False, unique=True)

@@ -1,9 +1,11 @@
-import pytest
 import os
-from app import create_app
-from apiflaskdemo.project.models import db, Alumno, User
+
+import pytest
+from flask.testing import FlaskClient
+
+from apiflaskdemo.project.models import Alumno, User, db
 from apiflaskdemo.project.schemas import AlumnoSchema
-from flask import Request
+from app import create_app
 from data.alumnos import data_alumnos
 
 os.environ.setdefault("APP_ENV", "test")
@@ -11,6 +13,7 @@ os.environ.setdefault("APP_TESTING", "1")
 os.environ.setdefault("APP_SEED_DATA", "1")
 
 app = create_app()
+
 
 @pytest.fixture(autouse=True)
 def reset_db():
@@ -20,15 +23,15 @@ def reset_db():
         db.create_all()
         for alumno in data_alumnos:
             db.session.add(Alumno(**alumno))
-        admin = User(username='admin', email='example@example.com', active=True)
-        admin.set_password('admin')
+        admin = User(username="admin", email="example@example.com", active=True)
+        admin.set_password("admin")
         db.session.add(admin)
         db.session.commit()
     yield
 
 
 @pytest.fixture
-def client() -> Request:
+def client() -> FlaskClient:  # type: ignore[misc]
     """Fixture que crea un cliente para hacer peticiones a la API"""
     with app.test_client() as client:
         yield client
@@ -36,7 +39,7 @@ def client() -> Request:
 
 def test_get_alumnos(client) -> None:
     """Test que comprueba que se pueden obtener los alumnos"""
-    r = client.get('/api/alumnos/')
+    r = client.get("/api/alumnos/")
     print("Validando que se puedan obtener los alumnos...")
     assert r.status_code == 200
     print("Se pueden obtener los alumnos.")
@@ -48,7 +51,7 @@ def test_get_alumnos(client) -> None:
 
 def test_get_alumno(client) -> None:
     """Test que comprueba que se puede obtener un alumno"""
-    r = client.get(f'/api/alumno/{data_alumnos[0]["cuenta"]}')
+    r = client.get(f"/api/alumno/{data_alumnos[0]['cuenta']}")
     print("Validando que se pueda obtener un alumno...")
     assert r.status_code == 200
     print("Se puede obtener un alumno.")
@@ -67,9 +70,9 @@ def test_post_alumno(client) -> None:
         "carrera": "Arquitectura",
         "semestre": 5,
         "promedio": 9.0,
-        "al_corriente": True
+        "al_corriente": True,
     }
-    r = client.post('/api/alumno/1234567', json=alumno)
+    r = client.post("/api/alumno/1234567", json=alumno)
     print("Validando que se pueda crear un alumno...")
     assert r.status_code == 201
     print("Se puede crear un alumno.")
@@ -88,9 +91,9 @@ def test_post_alumno_incorrecto(client) -> None:
         "carrera": "Natación",
         "semestre": -4,
         "promedio": 20.0,
-        "al_corriente": True
-        }
-    r = client.post('/api/alumno/1234569', json=alumno)
+        "al_corriente": True,
+    }
+    r = client.post("/api/alumno/1234569", json=alumno)
     print("Validando que no se pueda crear un alumno con un esquema incorrecto...")
     assert r.status_code == 422
     print(r.json)
@@ -105,11 +108,12 @@ def test_post_cuenta_duplicada(client):
         "carrera": "Arquitectura",
         "semestre": 5,
         "promedio": 9.0,
-        "al_corriente": True
+        "al_corriente": True,
     }
-    r = client.post('/api/alumno/1231221', json=alumno)
+    r = client.post("/api/alumno/1231221", json=alumno)
     print("Validando que no se pueda crear un alumno con cuenta duplicada...")
     assert r.status_code == 409
+
 
 def test_put_alumno(client) -> None:
     """Test que comprueba que se puede actualizar un alumno"""
@@ -120,9 +124,9 @@ def test_put_alumno(client) -> None:
         "carrera": "Arquitectura",
         "semestre": 5,
         "promedio": 9.0,
-        "al_corriente": True
+        "al_corriente": True,
     }
-    r = client.put('/api/alumno/1231224', json=alumno)
+    r = client.put("/api/alumno/1231224", json=alumno)
     print("Validando que se pueda actualizar un alumno...")
     assert r.status_code == 200
     print("Se puede actualizar un alumno.")
@@ -135,14 +139,15 @@ def test_put_alumno(client) -> None:
 
 def test_login_required(client) -> None:
     """Test que comprueba que se necesita iniciar sesión para eliminar un alumno"""
-    r = client.delete(f'/api/alumno/{data_alumnos[0]["cuenta"]}')
+    r = client.delete(f"/api/alumno/{data_alumnos[0]['cuenta']}")
     print("Validando que se necesite iniciar sesión para eliminar un alumno...")
     assert r.status_code == 403
     print("Se necesita iniciar sesión para eliminar un alumno.")
 
+
 def test_login(client) -> None:
     """Test que comprueba que se puede iniciar sesión"""
-    r = client.post('/auth/login', json={"username": "admin", "password": "admin"})
+    r = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     print("Validando que se pueda iniciar sesión...")
     assert r.status_code == 200
     print("Se puede iniciar sesión.")
@@ -150,7 +155,7 @@ def test_login(client) -> None:
 
 def test_login_incorrecto(client) -> None:
     """Test que comprueba que no se puede iniciar sesión con un usuario incorrecto"""
-    r = client.post('/auth/login', json={"username": "admin", "password": "incorrecto"})
+    r = client.post("/auth/login", json={"username": "admin", "password": "incorrecto"})
     print("Validando que no se pueda iniciar sesión con un usuario incorrecto...")
     assert r.status_code == 403
     print("No se puede iniciar sesión con un usuario incorrecto.")
@@ -158,11 +163,11 @@ def test_login_incorrecto(client) -> None:
 
 def test_del_alumno(client) -> None:
     """Test que comprueba que se puede eliminar un alumno"""
-    r = client.post('/auth/login', json={"username": "admin", "password": "admin"})
+    r = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     print("Validando que se pueda iniciar sesión...")
     assert r.status_code == 200
     print("Se puede iniciar sesión.")
-    r = client.delete(f'/api/alumno/{data_alumnos[0]["cuenta"]}')
+    r = client.delete(f"/api/alumno/{data_alumnos[0]['cuenta']}")
     print("Validando que se pueda eliminar un alumno...")
     assert r.status_code == 200
     print("Se puede eliminar un alumno.")
@@ -174,11 +179,11 @@ def test_del_alumno(client) -> None:
 
 def test_logout(client) -> None:
     """Test que comprueba que se puede cerrar sesión"""
-    r = client.post('/auth/login', json={"username": "admin", "password": "admin"})
+    r = client.post("/auth/login", json={"username": "admin", "password": "admin"})
     print("Validando que se pueda iniciar sesión...")
     assert r.status_code == 200
     print("Se puede iniciar sesión.")
-    r = client.get('/auth/logout')
+    r = client.get("/auth/logout")
     print("Validando que se pueda cerrar sesión...")
     assert r.status_code == 200
     print("Se puede cerrar sesión.")
