@@ -1,0 +1,156 @@
+name: Despliega en Cloud Run
+
+on:
+  push:
+    tags:
+      # Mismo patrón que los workflows de publicación de imagen.
+      # v1.2.3      → prod   v1.2.3-rc.1 → test
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Entorno destino — solo para re-deploys de emergencia"
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - prod
+
+permissions:
+  # Mínimo necesario para checkout.
+  contents: read
+  # Requerido para obtener el token OIDC de GCP sin llaves estáticas.
+  id-token: write
+
+jobs:
+  resolve-env:
+    # Determina el entorno destino a partir del patrón del tag, sin input manual.
+    # Tags con '-' (prerelease) → test. Tags limpios (estables) → prod.
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.resolve.outputs.target }}
+    steps:
+      - id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "target=${{ inputs.target_environment }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == *-* ]]; then
+            echo "target=test" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=prod" >> "$GITHUB_OUTPUT"
+          fi
+
+  despliega:
+    needs: resolve-env
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # El entorno activa las protecciones de aprobación manual configuradas en GitHub.
+    # Para prod: Settings → Environments → prod → Required reviewers.
+    environment: ${{ needs.resolve-env.outputs.target }}
+    env:
+      TARGET_ENV: ${{ needs.resolve-env.outputs.target }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Autenticar en GCP via OIDC
+        # Workload Identity Federation: GitHub Actions actúa como proveedor OIDC.
+        # No se almacenan llaves JSON de service account en ningún secreto.
+        # El binding en iam.tf restringe el acceso al repositorio y entorno exactos.
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Configurar gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Construir referencia de imagen
+        # Usa la imagen publicada en GHCR por envia-a-packages.yml con el mismo git tag.
+        # GHCR se usa en los workflows de demo del curso; Artifact Registry (provisionado
+        # por Terraform) es la alternativa para equipos con stack 100% GCP.
+        # El tag semver garantiza que imagen y despliegue corresponden al mismo commit.
+        run: |
+          IMAGE_VERSION="${{ github.ref_name }}"
+          # Elimina el prefijo 'v' para obtener la versión numérica del tag de imagen.
+          IMAGE_VERSION="${IMAGE_VERSION#v}"
+          echo "IMAGE_URL=ghcr.io/${{ github.repository }}:${IMAGE_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Capturar revisión activa antes del deploy
+        # Se guarda el nombre exacto de la revisión que tiene el 100% del tráfico
+        # en este momento. Cloud Run nombra las revisiones dinámicamente
+        # (ej. apiflask-demo-00003-abc); no existe la palabra reservada "PREVIOUS".
+        # Este valor se usa en el rollback si el smoke test falla.
+        run: |
+          PREV_REVISION=$(gcloud run services describe ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format "value(status.traffic[0].revisionName)")
+          echo "PREV_REVISION=$PREV_REVISION" >> "$GITHUB_ENV"
+
+      - name: Desplegar en Cloud Run sin enviar tráfico
+        # --no-traffic despliega la nueva revisión pero mantiene el 100% del tráfico
+        # en la revisión anterior. El smoke test valida la nueva revisión antes de
+        # promoverla. Si falla, el tráfico nunca llega a la revisión defectuosa.
+        # --tag asigna un identificador estable a la revisión para poder testearla
+        # directamente mediante su URL exclusiva antes de recibir tráfico real.
+        run: |
+          gcloud run deploy ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
+            --image "$IMAGE_URL" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --update-env-vars "APP_ENV=${{ env.TARGET_ENV }}" \
+            --add-cloudsql-instances "${{ vars.GCP_CLOUD_SQL_CONNECTION_NAME }}" \
+            --update-secrets "APP_SECRET_KEY=APP_SECRET_KEY:latest,APP_SECURITY_PASSWORD_SALT=APP_SECURITY_PASSWORD_SALT:latest" \
+            --no-traffic \
+            --tag "${{ github.ref_name }}"
+
+      - name: Obtener URL de la revisión candidata
+        # Cloud Run asigna una URL exclusiva por tag de revisión:
+        # https://<tag>---<servicio>-<hash>.<region>.run.app
+        # Permite hacer smoke test sobre la nueva revisión sin afectar usuarios reales.
+        run: |
+          CANDIDATE_URL=$(gcloud run services describe ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format "value(status.traffic[?tag=='${{ github.ref_name }}'].url)")
+          echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
+
+      - name: Smoke test — verificar respuesta HTTP 200
+        # Valida que la revisión candidata responde correctamente antes de recibir tráfico.
+        # -L sigue redirects: Flask devuelve 308 en rutas sin barra final (/api/alumnos
+        # redirige a /api/alumnos/); sin -L el curl capturaría el 308, no el 200.
+        # Una falla aquí bloquea la promoción; la revisión anterior sigue activa.
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L \
+            -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+            "$CANDIDATE_URL/api/alumnos/")
+          echo "Smoke test status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Smoke test falló (HTTP $STATUS) — no se promoverá tráfico."
+            exit 1
+          fi
+          echo "✅ Smoke test exitoso (HTTP $STATUS)."
+
+      - name: Promover tráfico a la nueva revisión
+        # Solo se ejecuta si el smoke test pasó.
+        # Mueve el 100% del tráfico a la revisión recién validada.
+        if: success()
+        run: |
+          gcloud run services update-traffic ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --to-latest
+
+      - name: Rollback — restaurar tráfico a la revisión anterior
+        # Solo se ejecuta si el smoke test falló.
+        # Usa el nombre exacto de la revisión capturado antes del deploy.
+        # Cloud Run no acepta "PREVIOUS" como identificador; el nombre de revisión
+        # es siempre dinámico (ej. apiflask-demo-00003-xyz).
+        if: failure()
+        run: |
+          gcloud run services update-traffic ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --to-revisions=${{ env.PREV_REVISION }}=100

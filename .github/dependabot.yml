@@ -1,15 +1,42 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-
 version: 2
 updates:
-  - package-ecosystem: "pip" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "pip"
+    directory: "/"
     schedule:
       interval: "weekly"
+    # Limita los PRs abiertos simultáneamente para reducir ruido en el repositorio.
+    open-pull-requests-limit: 5
+    groups:
+      # Agrupa todas las herramientas de desarrollo en un solo PR semanal
+      # en lugar de un PR por herramienta; reduce el ruido de revisión.
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "ruff"
+          - "mypy"
+          - "coverage*"
+          - "tox"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Agrupa las acciones de Docker en un PR para revisarlas juntas,
+      # ya que suelen actualizarse coordinadamente.
+      docker-actions:
+        patterns:
+          - "docker/*"
+      # Agrupa las acciones de GCP para revisión conjunta.
+      gcp-actions:
+        patterns:
+          - "google-github-actions/*"
+
+  # Monitorea actualizaciones de la imagen base del Dockerfile.
+  # Cuando python:3.11-slim tenga nuevo digest, Dependabot abre un PR.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3

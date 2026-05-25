@@ -1,0 +1,17 @@
+# CODEOWNERS — define quién debe aprobar cambios en archivos críticos.
+# Formato: <patrón> <@usuario o @org/equipo>
+# Documentación: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Cualquier PR que modifique un workflow requiere aprobación explícita.
+# Evita que un colaborador externo o una acción comprometida altere el pipeline
+# sin revisión humana (control contra el vector de ataque de workflows maliciosos).
+/.github/workflows/ @josechval
+
+# Cambios en la configuración de dependencias también requieren revisión,
+# ya que un atacante podría introducir una dependencia maliciosa via PR.
+/pyproject.toml @josechval
+/requirements.txt @josechval
+/uv.lock @josechval
+
+# Cambios en infraestructura como código afectan recursos de producción.
+/infra/ @josechval

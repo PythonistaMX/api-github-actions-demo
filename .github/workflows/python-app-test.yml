@@ -1,6 +1,3 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: Prueba la app
 
 on:
@@ -10,35 +7,104 @@ on:
   workflow_dispatch:
 
 permissions:
+  # Mínimo necesario para checkout y lectura del repositorio.
   contents: read
+  # Requerido para subir resultados de Trivy a GitHub Security (pestaña Security).
+  security-events: write
 
 jobs:
   prueba:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: test
+    strategy:
+      matrix:
+        # Probamos en todas las versiones de Python soportadas por pyproject.toml.
+        python-version: ["3.11", "3.12", "3.13"]
     env:
-      # Variables/secretos inyectados por entorno de GitHub Actions.
+      # Variables inyectadas desde el entorno GitHub Actions "test".
       APP_ENV: test
+      # APP_TESTING=1 activa el modo de prueba en Flask (base de datos en memoria).
       APP_TESTING: "1"
+      # APP_SEED_DATA=1 carga datos iniciales para que los tests de endpoints funcionen.
       APP_SEED_DATA: "1"
       DATABASE_URL: ${{ vars.DATABASE_URL }}
       APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
       APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
 
     steps:
+    # Pinning por tag; para hardening máximo reemplazar con SHA:
+    # actions/checkout@<sha> (obtener con: gh api repos/actions/checkout/git/ref/tags/v6)
     - uses: actions/checkout@v6
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+
+    - name: Instalar uv
+      # Pinning por tag; para hardening máximo reemplazar con SHA:
+      # astral-sh/setup-uv@<sha> (obtener con: gh api repos/astral-sh/setup-uv/git/ref/tags/v5)
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version: "3.10"
-    - name: Install dependencies
+        python-version: ${{ matrix.python-version }}
+
+    - name: Instalar dependencias desde lockfile
+      # --frozen verifica que uv.lock coincide con pyproject.toml y valida hashes SHA-256.
+      # Falla inmediatamente si el lockfile está desactualizado; garantiza reproducibilidad.
+      # --extra dev incluye las dependencias de desarrollo (pytest, ruff, mypy, etc.).
+      run: uv sync --frozen --extra dev
+
+    - name: Lint con ruff
+      # uv run ejecuta el comando dentro del entorno virtual creado por uv sync.
+      run: uv run ruff check .
+
+    - name: Formato con ruff
+      # Verifica que el código cumpla el estilo definido en [tool.ruff.format] de pyproject.toml.
+      run: uv run ruff format --check .
+
+    - name: Tipado con mypy
+      # Análisis estático de tipos; configurado en [tool.mypy] de pyproject.toml.
+      run: uv run mypy .
+
+    - name: Pruebas con pytest y cobertura
+      # --cov-fail-under=80 bloquea el pipeline si la cobertura cae por debajo del 80%.
+      # --junitxml genera el reporte de resultados en formato JUnit para GitHub Actions.
+      # --cov-report=xml genera el reporte de cobertura en formato XML (para artefacto).
       run: |
-        python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with ruff
-      run: |
-        ruff check .
-    - name: Test with pytest
-      run: |
-        pytest
+        uv run pytest \
+          --cov=apiflaskdemo \
+          --cov-fail-under=80 \
+          --cov-report=xml:coverage.xml \
+          --junitxml=junit-${{ matrix.python-version }}.xml
+
+    - name: Subir reporte de resultados de pruebas
+      # if: always() persiste el reporte aunque pytest falle, para poder revisar qué falló.
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: junit-${{ matrix.python-version }}
+        path: junit-${{ matrix.python-version }}.xml
+        if-no-files-found: error
+
+    - name: Subir reporte de cobertura
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.python-version }}
+        path: coverage.xml
+        if-no-files-found: error
+
+    - name: Escanear dependencias con Trivy (fs)
+      # scan-type: fs analiza el proyecto completo incluyendo uv.lock para detectar
+      # vulnerabilidades conocidas (CVEs) en las dependencias antes de construir la imagen.
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        # SARIF permite ver los hallazgos directamente en la pestaña Security del repo.
+        format: sarif
+        output: trivy-fs-results.sarif
+
+    - name: Subir resultados de Trivy a GitHub Security
+      # if: always() asegura que los resultados se suban incluso si Trivy encontró CVEs.
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-fs-results.sarif
+        category: trivy-fs-${{ matrix.python-version }}

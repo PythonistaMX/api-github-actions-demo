@@ -1,10 +1,16 @@
 name: Publish image to Packages
 
 on:
+  push:
+    tags:
+      # v1.2.3         → prod  (release estable)
+      # v1.2.3-rc.1    → test  (release candidate)
+      # v1.2.3-beta.1  → test  (beta)
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       target_environment:
-        description: "Entorno destino (test o prod)"
+        description: "Entorno destino — solo para re-deploys de emergencia"
         required: true
         default: test
         type: choice
@@ -17,23 +23,37 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  resolve-env:
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.resolve.outputs.target }}
+    steps:
+      - id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "target=${{ inputs.target_environment }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" == *-* ]]; then
+            echo "target=test" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=prod" >> "$GITHUB_OUTPUT"
+          fi
+
   push_to_registry:
+    needs: resolve-env
     name: Push Docker image to Packages
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.target_environment }}
+    environment: ${{ needs.resolve-env.outputs.target }}
     env:
-      # Variables/secretos inyectados por entorno de GitHub Actions.
-      APP_ENV: ${{ inputs.target_environment }}
+      APP_ENV: ${{ needs.resolve-env.outputs.target }}
       DATABASE_URL: ${{ vars.DATABASE_URL }}
       APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
       APP_SECURITY_PASSWORD_SALT: ${{ secrets.APP_SECURITY_PASSWORD_SALT }}
     permissions:
-      # Permisos minimos necesarios para publicar en GHCR.
       contents: read
       packages: write
       id-token: write
-    
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -50,7 +70,7 @@ jobs:
           hide-progress: true
           severity: HIGH,CRITICAL
           exit-code: '1'
-      
+
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
@@ -66,8 +86,10 @@ jobs:
           tags: |
             # Tag inmutable por commit para trazabilidad.
             type=sha
-            # latest solo en rama por defecto para evitar ambiguedad.
-            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag semver desde el git tag.
+            type=semver,pattern={{version}}
+            # latest solo en releases estables de la rama por defecto.
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
 
       - name: Build and push Docker image
         id: build_and_push
@@ -111,13 +133,19 @@ jobs:
 
       - name: Verify signature and attestation
         run: |
+          # El regexp restringe la verificación al workflow exacto que firmó la imagen:
+          # - repositorio: ${{ github.repository }} (no cualquier repo de GitHub)
+          # - archivo:     envia-a-packages.yml (no cualquier workflow del repo)
+          # - ref:         tags semver vX.Y.Z o vX.Y.Z-prerelease
+          # Un regexp más permisivo (ej. "https://github.com/.+") acepta firmas de
+          # cualquier repo o workflow, anulando la garantía de provenance.
           cosign verify \
-            --certificate-identity-regexp "https://github.com/.+" \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-packages.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$IMAGE_REF"
           cosign verify-attestation \
             --type spdxjson \
-            --certificate-identity-regexp "https://github.com/.+" \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-packages.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$IMAGE_REF"
 

@@ -1,47 +1,238 @@
 # Aplicación de demostración de una API simple basada en APiFlask
 
+## Workflows
+
+| Workflow | Trigger | Qué hace |
+|---|---|---|
+| `python-app-test.yml` | `push main`, `pull_request`, manual | Quality gates (ruff, mypy, pytest-cov, Trivy fs) en matriz Python 3.11/3.12/3.13 |
+| `empaqueta.yaml` | Manual | Quality gates → empaquetado con tox → artefacto `.tar.gz` |
+| `envia-a-docker.yaml` | Tag `v*.*.*`, manual | Publica imagen en Docker Hub con SBOM, firma Cosign y Trivy |
+| `envia-a-packages.yml` | Tag `v*.*.*`, manual | Publica imagen en GHCR con SBOM, firma Cosign y Trivy |
+| `despliega-cloud-run.yaml` | Tag `v*.*.*`, manual | Despliega en Cloud Run vía OIDC; smoke test + rollback automático |
+
+### Quality gates
+
+Cada workflow de CI ejecuta esta cadena en orden; si un paso falla el pipeline se detiene:
+
+```
+uv sync --frozen --extra dev   # instala desde lockfile verificando hashes SHA-256
+        ↓
+ruff check .                   # lint: errores de estilo y bugs comunes
+        ↓
+ruff format --check .          # formato: verificación sin modificar archivos
+        ↓
+mypy .                         # tipado estático
+        ↓
+pytest --cov=apiflaskdemo \    # pruebas + cobertura mínima del 80%
+       --cov-fail-under=80
+        ↓
+trivy fs (SARIF → GitHub Security)   # vulnerabilidades en dependencias
+```
+
+Los resultados de pytest (JUnit XML) y la cobertura (XML) se suben como
+artefactos del workflow aunque el pipeline falle, para facilitar el diagnóstico.
+
+## Política de tags y releases
+
+Los workflows de publicación (`envia-a-docker`, `envia-a-packages`) se activan automáticamente al crear un git tag semver. El entorno destino se infiere del tag:
+
+| Patrón de tag | Entorno | Ejemplo |
+|---|---|---|
+| `vX.Y.Z` | `prod` — requiere aprobación | `v1.2.0` |
+| `vX.Y.Z-rc.N` | `test` — automático | `v1.2.0-rc.1` |
+| `vX.Y.Z-beta.N` | `test` — automático | `v1.2.0-beta.2` |
+| `vX.Y.Z-alpha.N` | `test` — automático | `v1.2.0-alpha.1` |
+
+La regla es simple: cualquier tag con `-` va a `test`; sin `-` va a `prod`.
+
+**Flujo recomendado:**
+
+```
+git tag v1.2.0-rc.1 && git push --tags   # despliega a test automáticamente
+# ... validar en test ...
+git tag v1.2.0 && git push --tags         # solicita aprobación → despliega a prod
+```
+
+**Gate de aprobación para `prod`:** configura _Required reviewers_ en
+`Settings → Environments → prod`. El workflow se pausará antes del job
+`push_to_registry` hasta recibir aprobación manual.
+
+**Re-deploys de emergencia:** usa `workflow_dispatch` en el workflow correspondiente
+para forzar una imagen existente sin crear un nuevo tag.
+
+### Tags de imagen Docker
+
+Cada publicación genera tres tags de imagen:
+
+| Tag | Descripción |
+|---|---|
+| `sha-<commit>` | Inmutable — trazabilidad exacta al commit |
+| `<version>` | Semver extraído del git tag (ej. `1.2.0`) |
+| `latest` | Solo en releases estables (`vX.Y.Z` sin prerelease) |
+
 ## Configuración de entornos en GitHub Actions
 
-Este proyecto espera tres entornos en GitHub Actions: `dev`, `test` y `prod`.
+El proyecto usa tres entornos en `Settings → Environments`: `dev`, `test` y `prod`.
+Cada workflow declara `environment: <nombre>` para que GitHub inyecte
+automáticamente las variables y secretos del entorno correspondiente.
 
-Variables por entorno (`Settings` -> `Environments` -> `Variables`):
+### Secretos a nivel de repositorio
 
-- `DATABASE_URL`: cadena de conexión de base de datos por entorno.
+Se configuran en `Settings → Secrets and variables → Actions → Repository secrets`.
+Son compartidos por todos los entornos.
 
-Secretos por entorno (`Settings` -> `Environments` -> `Secrets`):
+| Secreto | Descripción |
+|---|---|
+| `DOCKER_USERNAME` | Usuario de Docker Hub para publicar imágenes |
+| `DOCKER_PASSWORD` | Token de acceso de Docker Hub (no contraseña) |
 
-- `APP_SECRET_KEY`: clave secreta de la aplicación.
-- `APP_SECURITY_PASSWORD_SALT`: salt para funciones de seguridad.
+> `GITHUB_TOKEN` lo genera GitHub automáticamente; no requiere configuración.
 
-Notas operativas:
+### Entorno `dev` — máquina del desarrollador
 
-- La app toma configuración desde variables de entorno en `apiflaskdemo/settings.py`.
-- Los workflows usan `environment` para consumir `vars` y `secrets` del entorno seleccionado.
-- Para pruebas automatizadas se usa `APP_TESTING=1` y `APP_SEED_DATA=1` en CI.
+Usado por el job `build_artifact` de `empaqueta.yaml`. Usa SQLite como base de
+datos, por lo que no requiere servidor ni credenciales de base de datos.
 
-## Integración con Terraform y OIDC en GCP
+**Variables** (`Settings → Environments → dev → Variables`):
 
-Para `prod`, el flujo recomendado es:
+| Variable | Ejemplo |
+|---|---|
+| `DATABASE_URL` | `sqlite:///apiflask_dev.db` |
 
-1. Terraform aprovisiona infraestructura en `infra/terraform-py271`.
-2. GitHub Actions autentica con OIDC (sin llaves estáticas).
-3. El pipeline usa variables de entorno y outputs de Terraform para desplegar.
+**Secretos** (`Settings → Environments → dev → Secrets`):
 
-Variables recomendadas en el entorno `prod`:
+| Secreto | Descripción |
+|---|---|
+| `APP_SECRET_KEY` | Clave secreta de Flask |
+| `APP_SECURITY_PASSWORD_SALT` | Salt para hashing de contraseñas |
 
-- `GCP_PROJECT_ID`: ID del proyecto GCP.
-- `GCP_REGION`: región de despliegue.
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`: recurso WIF, por ejemplo `projects/.../providers/...`.
-- `GCP_SERVICE_ACCOUNT`: cuenta de servicio para despliegue, por ejemplo `cicd-deployer@...`.
-- `DATABASE_URL`: cadena de conexión a Cloud SQL PostgreSQL.
+### Entorno `test` — servidor Linux con Docker y PostgreSQL
 
-Secretos recomendados en el entorno `prod`:
+Usado por `python-app-test.yml`, el job `calidad` de `empaqueta.yaml`,
+y los workflows de publicación cuando el tag contiene `-` (prerelease).
 
-- `APP_SECRET_KEY`
-- `APP_SECURITY_PASSWORD_SALT`
+**Variables** (`Settings → Environments → test → Variables`):
 
-Notas de seguridad:
+| Variable | Ejemplo |
+|---|---|
+| `DATABASE_URL` | `postgresql://user:pass@test-server:5432/apiflask_test` |
 
-- Evita guardar JSON keys de service accounts en GitHub Secrets.
-- Usa `permissions: id-token: write` en jobs que autentican contra GCP.
-- Protege el entorno `prod` con aprobaciones y ramas permitidas.
+**Secretos** (`Settings → Environments → test → Secrets`):
+
+| Secreto | Descripción |
+|---|---|
+| `APP_SECRET_KEY` | Clave secreta de Flask |
+| `APP_SECURITY_PASSWORD_SALT` | Salt para hashing de contraseñas |
+
+### Entorno `prod` — GCP Cloud Run + Cloud SQL
+
+Usado por los workflows de publicación cuando el tag es un release estable
+(sin `-`). Configura _Required reviewers_ aquí para el gate de aprobación.
+
+La infraestructura se gestiona con Terraform en `infra/terraform-py271/`.
+Los valores de las variables de GCP se obtienen directamente de los outputs de
+Terraform tras ejecutar `terraform apply`:
+
+```bash
+terraform -chdir=infra/terraform-py271 output
+```
+
+**Variables** (`Settings → Environments → prod → Variables`):
+
+| Variable | Origen |
+|---|---|
+| `GCP_PROJECT_ID` | Valor de `project_id` en `terraform.tfvars` |
+| `GCP_REGION` | Valor de `region` en `terraform.tfvars` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `terraform output workload_identity_provider` |
+| `GCP_SERVICE_ACCOUNT` | `terraform output cicd_service_account_email` |
+| `GCP_CLOUD_RUN_SERVICE` | `terraform output cloud_run_service_name` |
+| `GCP_CLOUD_SQL_CONNECTION_NAME` | `terraform output cloud_sql_instance_connection_name` |
+
+> `DATABASE_URL` **no** se configura como variable de GitHub Actions. Terraform
+> la inyecta en Cloud Run directamente desde Secret Manager vía
+> `value_source.secret_key_ref`. Tras el primer `terraform apply`, pobla la
+> versión del secreto manualmente (ver `infra/terraform-py271/README.md`).
+
+Copia `infra/terraform-py271/terraform.tfvars.example` a `terraform.tfvars`
+y completa los valores antes de aplicar. La contraseña de base de datos se
+pasa como variable de entorno para no escribirla en disco:
+
+```bash
+export TF_VAR_db_password="<valor-seguro>"
+terraform -chdir=infra/terraform-py271 apply
+```
+
+**Secretos** (`Settings → Environments → prod → Secrets`):
+
+| Secreto | Descripción |
+|---|---|
+| `APP_SECRET_KEY` | Clave secreta de Flask — inyectada en Cloud Run via `--update-secrets` |
+| `APP_SECURITY_PASSWORD_SALT` | Salt para hashing de contraseñas — inyectada en Cloud Run via `--update-secrets` |
+
+> No guardes JSON keys de service accounts en Secrets. La autenticación con GCP
+> se hace vía OIDC Workload Identity Federation; los workflows ya incluyen
+> `permissions: id-token: write` para habilitarlo. El binding WIF en
+> `iam.tf` restringe el acceso al repositorio y al entorno GitHub Actions
+> configurados en `terraform.tfvars`.
+
+## Configuración de rama protegida
+
+La combinación de rama protegida + checks obligatorios + CODEOWNERS sobre workflows
+es la base técnica del pipeline de este curso (NB03). Sin ella, las políticas de
+revisión son sugerencias que cualquier colaborador con acceso puede ignorar.
+
+Configurar en `Settings → Branches → Add ruleset` sobre la rama `main`:
+
+| Regla | Valor recomendado | Por qué |
+|---|---|---|
+| Require a pull request before merging | ✅ activado | Ningún cambio llega a `main` sin revisión |
+| Required approvals | 1 | Al menos una aprobación humana |
+| Require review from Code Owners | ✅ activado | Activa `.github/CODEOWNERS` para archivos críticos |
+| Require status checks to pass | ✅ activado | El merge solo ocurre si el CI está verde |
+| Required status checks | ver tabla abajo | |
+| Block force pushes | ✅ activado | Evita reescribir el historial de `main` |
+| Restrict deletions | ✅ activado | Nadie puede borrar la rama principal |
+
+**Status checks requeridos** (nombre exacto tal como aparece en GitHub):
+
+| Check | Workflow | Versiones |
+|---|---|---|
+| `prueba (3.11)` | `python-app-test.yml` | Python 3.11 |
+| `prueba (3.12)` | `python-app-test.yml` | Python 3.12 |
+| `prueba (3.13)` | `python-app-test.yml` | Python 3.13 |
+
+### Protección de tags semver
+
+Configurar en `Settings → Rules → New ruleset → Tag` sobre el patrón `v*.*.*`:
+
+| Regla | Por qué |
+|---|---|
+| Restrict deletions | Un tag de release no puede borrarse retroactivamente |
+| Block force pushes | Evita mover el tag a otro commit |
+
+Sin esta protección un tag es una referencia mutable — exactamente el riesgo
+descrito en el NB01 del curso.
+
+## Protección de archivos críticos (CODEOWNERS)
+
+`.github/CODEOWNERS` exige aprobación del propietario del repositorio en
+cualquier PR que modifique:
+
+| Ruta protegida | Por qué |
+|---|---|
+| `.github/workflows/` | Evita que un atacante altere el pipeline via PR |
+| `pyproject.toml`, `requirements.txt`, `uv.lock` | Previene introducción de dependencias maliciosas |
+| `infra/` | Cambios en IaC afectan recursos de producción |
+
+Para activarlo: `Settings → Branches → main → Require review from Code Owners`.
+
+### Variables de entorno en CI
+
+Algunos workflows inyectan variables adicionales que no provienen de GitHub
+Environments sino que se fijan directamente en el YAML:
+
+| Variable | Valor en CI | Propósito |
+|---|---|---|
+| `APP_TESTING` | `"1"` | Activa el modo de prueba en Flask |
+| `APP_SEED_DATA` | `"1"` | Carga datos iniciales al arrancar |
+| `APP_ENV` | `test` / `prod` | Indica el entorno activo a la app |
