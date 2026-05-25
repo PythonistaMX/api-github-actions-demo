@@ -9,9 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /demo
 
-COPY requirements.txt ./
+COPY requirements.runtime.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip==24.3.1 \
-	&& pip install --no-cache-dir -r requirements.txt
+	&& pip install --no-cache-dir -r requirements.runtime.txt
 
 COPY app.py ./
 COPY apiflaskdemo ./apiflaskdemo
