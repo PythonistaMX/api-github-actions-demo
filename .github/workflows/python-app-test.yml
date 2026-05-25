@@ -93,7 +93,7 @@ jobs:
     - name: Escanear dependencias con Trivy (fs)
       # scan-type: fs analiza el proyecto completo incluyendo uv.lock para detectar
       # vulnerabilidades conocidas (CVEs) en las dependencias antes de construir la imagen.
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@v0.36.0
       with:
         scan-type: fs
         scan-ref: .
