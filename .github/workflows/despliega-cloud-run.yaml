@@ -16,6 +16,10 @@ on:
         options:
           - test
           - prod
+      image_version:
+        description: "Versión de imagen ya publicada en GHCR (ej: 1.2.3 o 1.2.3-rc.1)"
+        required: true
+        type: string
 
 permissions:
   # Mínimo necesario para checkout.
@@ -72,10 +76,31 @@ jobs:
         # por Terraform) es la alternativa para equipos con stack 100% GCP.
         # El tag semver garantiza que imagen y despliegue corresponden al mismo commit.
         run: |
-          IMAGE_VERSION="${{ github.ref_name }}"
-          # Elimina el prefijo 'v' para obtener la versión numérica del tag de imagen.
-          IMAGE_VERSION="${IMAGE_VERSION#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            IMAGE_VERSION="${{ inputs.image_version }}"
+          else
+            IMAGE_VERSION="${{ github.ref_name }}"
+            # Elimina el prefijo 'v' para obtener la versión numérica del tag de imagen.
+            IMAGE_VERSION="${IMAGE_VERSION#v}"
+          fi
+
+          if ! [[ "$IMAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Version invalida: '$IMAGE_VERSION'. Usa formato semver (ej: 1.2.3 o 1.2.3-rc.1)."
+            exit 1
+          fi
+
+          # Cloud Run traffic tags solo permiten [a-z0-9-] y deben iniciar con letra.
+          ROLLOUT_TAG="v${IMAGE_VERSION}"
+          ROLLOUT_TAG=$(echo "$ROLLOUT_TAG" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-+//; s/-+$//')
+          ROLLOUT_TAG="${ROLLOUT_TAG:0:63}"
+
+          if ! [[ "$ROLLOUT_TAG" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            echo "Tag invalido para Cloud Run: '$ROLLOUT_TAG'."
+            exit 1
+          fi
+
           echo "IMAGE_URL=ghcr.io/${{ github.repository }}:${IMAGE_VERSION}" >> "$GITHUB_ENV"
+          echo "ROLLOUT_TAG=$ROLLOUT_TAG" >> "$GITHUB_ENV"
 
       - name: Capturar revisión activa antes del deploy
         # Se guarda el nombre exacto de la revisión que tiene el 100% del tráfico
@@ -104,7 +129,7 @@ jobs:
             --add-cloudsql-instances "${{ vars.GCP_CLOUD_SQL_CONNECTION_NAME }}" \
             --update-secrets "APP_SECRET_KEY=APP_SECRET_KEY:latest,APP_SECURITY_PASSWORD_SALT=APP_SECURITY_PASSWORD_SALT:latest" \
             --no-traffic \
-            --tag "${{ github.ref_name }}"
+            --tag "$ROLLOUT_TAG"
 
       - name: Obtener URL de la revisión candidata
         # Cloud Run asigna una URL exclusiva por tag de revisión:
@@ -114,7 +139,7 @@ jobs:
           CANDIDATE_URL=$(gcloud run services describe ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
             --region "${{ vars.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
-            --format "value(status.traffic[?tag=='${{ github.ref_name }}'].url)")
+            --format "value(status.traffic[?tag=='${ROLLOUT_TAG}'].url)")
           echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
 
       - name: Smoke test — verificar respuesta HTTP 200

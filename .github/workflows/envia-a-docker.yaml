@@ -131,19 +131,25 @@ jobs:
 
       - name: Verify signature and attestation
         run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            CERT_REF_REGEX='refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?'
+          else
+            CERT_REF_REGEX='refs/heads/main'
+          fi
+
           # El regexp restringe la verificación al workflow exacto que firmó la imagen:
           # - repositorio: ${{ github.repository }} (no cualquier repo de GitHub)
           # - archivo:     envia-a-docker.yaml (no cualquier workflow del repo)
-          # - ref:         tags semver vX.Y.Z o vX.Y.Z-prerelease
+          # - ref:         tags semver (incluye prerelease) o rama main en re-deploy manual
           # Un regexp más permisivo (ej. "https://github.com/.+") acepta firmas de
           # cualquier repo o workflow, anulando la garantía de provenance.
           cosign verify \
-            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-docker.yaml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+" \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-docker.yaml@${CERT_REF_REGEX}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$IMAGE_REF"
           cosign verify-attestation \
             --type spdxjson \
-            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-docker.yaml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+" \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/envia-a-docker.yaml@${CERT_REF_REGEX}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$IMAGE_REF"
 
