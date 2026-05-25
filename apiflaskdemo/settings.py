@@ -17,9 +17,10 @@ DEBUG = _as_bool(os.getenv("APP_DEBUG"), default=False)
 TESTING = _as_bool(os.getenv("APP_TESTING"), default=False)
 
 # Secretos por entorno via GitHub Actions -> Secrets.
-SECRET_KEY = os.getenv("APP_SECRET_KEY", "dev-insecure-secret-change-me")
-SECURITY_PASSWORD_SALT = os.getenv(
-    "APP_SECURITY_PASSWORD_SALT", "dev-insecure-salt-change-me"
+# `or` cubre None y "" (GitHub evalúa secretos no configurados como cadena vacía).
+SECRET_KEY = os.getenv("APP_SECRET_KEY") or "dev-insecure-secret-change-me"
+SECURITY_PASSWORD_SALT = (
+    os.getenv("APP_SECURITY_PASSWORD_SALT") or "dev-insecure-salt-change-me"
 )
 
 
