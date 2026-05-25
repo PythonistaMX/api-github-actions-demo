@@ -111,7 +111,8 @@ jobs:
       - name: Build immutable image reference
         id: image_ref
         run: |
-          IMAGE_REF="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')@${{ steps.build_and_push.outputs.digest }}"
+          IMAGE_NAME_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_REF="${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}@${{ steps.build_and_push.outputs.digest }}"
           echo "IMAGE_REF=$IMAGE_REF" >> "$GITHUB_ENV"
           echo "image_ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
 
