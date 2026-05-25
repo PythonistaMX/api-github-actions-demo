@@ -45,6 +45,33 @@ El binario de `uv` se copia desde la imagen oficial `ghcr.io/astral-sh/uv`
 (versión fijada en el Dockerfile) como etapa previa, sin añadir capas de
 instalación adicionales.
 
+### Particularidades del registro GHCR (`envia-a-packages.yml`)
+
+GHCR tiene dos diferencias de comportamiento respecto a Docker Hub que afectan
+al workflow:
+
+**Nombres de imagen en lowercase obligatorio.** `github.repository` devuelve
+el nombre del repositorio con la capitalización original del propietario
+(ej. `PythonistaMX/api-github-actions-demo`). `docker/build-push-action`
+normaliza a lowercase internamente al publicar, pero cuando el workflow
+construye `IMAGE_REF` manualmente para pasarlo a Trivy, Syft y cosign, esa
+normalización hay que hacerla de forma explícita:
+
+```bash
+IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+```
+
+Sin esto, la librería Go `distribution/reference` que usa Trivy rechaza la
+referencia con el error `could not parse image reference` antes de llegar
+al escaneo real. Docker Hub no tiene este problema porque `DOCKERHUB_IMAGE`
+se construye desde el secreto `DOCKER_USERNAME`, que ya es lowercase.
+
+**Autenticación obligatoria para lectura.** Docker Hub permite pulls públicos
+sin credenciales. GHCR requiere autenticación incluso para leer una imagen,
+aunque sea pública. El step de Trivy recibe `TRIVY_USERNAME` y
+`TRIVY_PASSWORD` (con el `GITHUB_TOKEN` del job) para que pueda descargar
+la imagen antes de escanearla.
+
 ## Política de tags y releases
 
 Los workflows de publicación (`envia-a-docker`, `envia-a-packages`) se activan automáticamente al crear un git tag semver. El entorno destino se infiere del tag:
