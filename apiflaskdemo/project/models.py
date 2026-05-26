@@ -29,5 +29,4 @@ class User(db.Model):  # type: ignore[name-defined]
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password, password)
-    
-    
+
