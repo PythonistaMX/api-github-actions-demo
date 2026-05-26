@@ -1,6 +1,6 @@
 # Usamos tag versionado para evitar roturas por digests retirados y mantener
 # una base estable en la rama 3.11.
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Instala el binario de uv para gestionar dependencias de forma reproducible.
 COPY --from=ghcr.io/astral-sh/uv:0.7.22 /uv /uvx /bin/
