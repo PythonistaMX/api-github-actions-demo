@@ -72,8 +72,6 @@ jobs:
 
       - name: Construir referencia de imagen
         # Usa la imagen publicada en GHCR por envia-a-packages.yml con el mismo git tag.
-        # GHCR se usa en los workflows de demo del curso; Artifact Registry (provisionado
-        # por Terraform) es la alternativa para equipos con stack 100% GCP.
         # El tag semver garantiza que imagen y despliegue corresponden al mismo commit.
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
