@@ -12,9 +12,9 @@ class Alumno(db.Model):  # type: ignore[name-defined]
     nombre = db.Column(db.String(50))
     primer_apellido = db.Column(db.String(50))
     segundo_apellido = db.Column(db.String(50))
-    carrera = db.Column(db.String(50))          # string libre, sin catálogo
-    semestre = db.Column(db.Integer)            # validado 1–9 en AlumnoInSchema
-    promedio = db.Column(db.Float)              # validado 0.0–10.0 en AlumnoInSchema
+    carrera = db.Column(db.String(50))  # string libre, sin catálogo
+    semestre = db.Column(db.Integer)  # validado 1–9 en AlumnoInSchema
+    promedio = db.Column(db.Float)  # validado 0.0–10.0 en AlumnoInSchema
     al_corriente = db.Column(db.Boolean)
 
 
@@ -25,7 +25,7 @@ class User(db.Model):  # type: ignore[name-defined]
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email = db.Column(db.String(255), nullable=False, unique=True)
     username = db.Column(db.String(25), nullable=False, unique=True)
-    password = db.Column(db.String(255))        # almacenado como hash Werkzeug
+    password = db.Column(db.String(255))  # almacenado como hash Werkzeug
     active = db.Column(db.Boolean())
 
     def set_password(self, password: str) -> None:
