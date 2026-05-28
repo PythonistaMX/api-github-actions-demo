@@ -72,7 +72,7 @@ jobs:
           exit-code: '1'
 
       - name: Log in to the Container registry
-        uses: docker/login-action@04bf81902ca5d9c8e9f40ca42da112a7cb239165
+        uses: docker/login-action@d74126fafb7d8baee06dfff4003b911af7cf0662
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -80,7 +80,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@17e943b6741018cb076d01088a79f7a301f67b15
+        uses: docker/metadata-action@530a407188b1fe155ed1e7bdbb03e70a5eb8cc6a
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -93,7 +93,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build_and_push
-        uses: docker/build-push-action@473e09f9b5aedf66570255d5249136a73b8f2d86
+        uses: docker/build-push-action@abf612226dcaa0fa742b57b98c02cf79cc4866cc
         with:
           context: .
           push: true
