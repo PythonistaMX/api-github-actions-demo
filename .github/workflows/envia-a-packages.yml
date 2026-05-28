@@ -186,16 +186,3 @@ jobs:
           docker push "$AR_IMAGE"
           echo "image=$AR_IMAGE" >> "$GITHUB_OUTPUT"
 
-      - name: Desplegar en Cloud Run — solo prod
-        if: needs.resolve-env.outputs.target == 'prod'
-        uses: google-github-actions/deploy-cloudrun@v3
-        with:
-          service: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
-          region: ${{ vars.GCP_REGION }}
-          image: ${{ steps.ar_push.outputs.image }}
-          env_vars: |
-            APP_ENV=prod
-          secrets: |
-            DATABASE_URL=DATABASE_URL:latest
-            APP_SECRET_KEY=APP_SECRET_KEY:latest
-            APP_SECURITY_PASSWORD_SALT=APP_SECURITY_PASSWORD_SALT:latest

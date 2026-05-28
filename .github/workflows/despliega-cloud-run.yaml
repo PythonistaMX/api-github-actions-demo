@@ -97,7 +97,7 @@ jobs:
             exit 1
           fi
 
-          echo "IMAGE_URL=ghcr.io/${{ github.repository }}:${IMAGE_VERSION}" >> "$GITHUB_ENV"
+          echo "IMAGE_URL=${{ vars.GCP_ARTIFACT_REGISTRY }}/${{ vars.GCP_CLOUD_RUN_SERVICE }}:${IMAGE_VERSION}" >> "$GITHUB_ENV"
           echo "ROLLOUT_TAG=$ROLLOUT_TAG" >> "$GITHUB_ENV"
 
       - name: Capturar revisión activa antes del deploy
