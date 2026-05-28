@@ -1,4 +1,67 @@
-# Aplicación de demostración de una API simple basada en APiFlask
+# Aplicación de demostración de una API simple basada en APIFlask
+
+API REST para gestionar un catálogo de alumnos, construida con APIFlask y
+SQLAlchemy. Demuestra un pipeline CI/CD completo hacia GCP Cloud Run con
+calidad de código, seguridad de imagen y despliegue blue/green.
+
+## Estructura del proyecto
+
+```
+app.py                  # entrypoint: instancia la app y la expone a gunicorn
+apiflaskdemo/
+  __init__.py           # factory de la app (create_app)
+  settings.py           # configuración por entorno (dev/test/prod)
+  project/
+    models.py           # modelos SQLAlchemy: Alumno, User
+    schemas.py          # esquemas de validación APIFlask
+    blueprints.py       # endpoints CRUD de alumnos
+    auth/               # autenticación HTTP Basic
+data/
+  alumnos.py            # datos semilla para dev/test
+tests/                  # suite pytest
+.github/workflows/      # pipelines CI/CD
+```
+
+## Desarrollo local
+
+### Requisitos previos
+
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) para gestión de dependencias
+
+### Instalación
+
+```bash
+git clone <repo>
+cd api-github-actions-demo
+uv sync --frozen --extra dev
+```
+
+### Ejecutar en modo desarrollo (SQLite en memoria)
+
+```bash
+APP_ENV=dev uv run flask run --port 5000
+```
+
+El entorno `dev` usa SQLite y carga datos semilla automáticamente al arrancar.
+
+### Ejecutar los tests
+
+```bash
+# Tests + cobertura (umbral mínimo: 80%)
+uv run pytest --cov=apiflaskdemo --cov-fail-under=80
+
+# Con reporte HTML
+uv run pytest --cov=apiflaskdemo --cov-report=html
+```
+
+### Lint y formato
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy .
+```
 
 ## Workflows
 
@@ -34,10 +97,10 @@ artefactos del workflow aunque el pipeline falle, para facilitar el diagnóstico
 
 ## Imagen Docker
 
-La imagen de producción se construye desde `python:3.11-slim` e instala
+La imagen de producción se construye desde `python:3.14-slim` e instala
 únicamente las dependencias declaradas en `requirements.runtime.txt`
-(5 paquetes: apiflask, email-validator, bcrypt, Flask-SQLAlchemy, gunicorn)
-usando `uv pip install --system`. Las dependencias de desarrollo (pytest,
+(6 paquetes: apiflask, email-validator, bcrypt, Flask-SQLAlchemy,
+psycopg2-binary, gunicorn) usando `uv pip install --system`. Las dependencias de desarrollo (pytest,
 mypy, ruff, etc.) no se incluyen, lo que reduce significativamente la
 superficie de vulnerabilidades detectadas por Trivy en el escaneo de imagen.
 

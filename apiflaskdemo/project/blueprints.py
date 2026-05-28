@@ -10,14 +10,14 @@ abc_alumnos = APIBlueprint("abc_alumno", __name__)
 @abc_alumnos.get("/alumnos/")
 @abc_alumnos.output(AlumnoSchema(many=True))
 def vuelca_base():
-    # Método para volcar la base de datos
+    """Retorna todos los alumnos. Sin paginación — volumen acotado en este demo."""
     return Alumno.query.all()
 
 
 @abc_alumnos.get("/alumno/<int:cuenta>")
 @abc_alumnos.output(AlumnoSchema)
 def despliega_alumno(cuenta):
-    """Método para desplegar un alumno en particular"""
+    """Retorna un alumno por número de cuenta; 404 si no existe."""
     return Alumno.query.get_or_404(cuenta)
 
 
@@ -50,7 +50,10 @@ def crea_alumno(cuenta, json_data):
 @abc_alumnos.put("/alumno/<int:cuenta>")
 @abc_alumnos.output(AlumnoSchema)
 @abc_alumnos.input(AlumnoInSchema)
+@login_required
 def sustituye_alumno(cuenta, json_data):
+    """Reemplaza todos los campos del alumno (semántica PUT completo, no PATCH parcial).
+    Implementado como delete + insert para que SQLAlchemy valide el modelo completo."""
     alumno = Alumno.query.get_or_404(cuenta)
     db.session.delete(alumno)
     json_data["cuenta"] = cuenta

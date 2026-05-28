@@ -193,6 +193,9 @@ jobs:
           echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
 
       - name: Smoke test — verificar respuesta HTTP 200
+        # /api/alumnos/ es el endpoint de lectura principal; valida que la app
+        # arranca, conecta a Cloud SQL y responde correctamente antes de
+        # recibir tráfico real. Devuelve 200 [] si la tabla existe y está vacía.
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L \
             -H "Authorization: Bearer $(gcloud auth print-identity-token --impersonate-service-account=${{ vars.GCP_SERVICE_ACCOUNT }})" \
