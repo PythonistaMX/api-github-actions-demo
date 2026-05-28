@@ -1,12 +1,6 @@
 name: Publish image to Packages
 
 on:
-  push:
-    tags:
-      # v1.2.3         → prod  (release estable)
-      # v1.2.3-rc.1    → test  (release candidate)
-      # v1.2.3-beta.1  → test  (beta)
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
       target_environment:
