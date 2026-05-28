@@ -20,12 +20,15 @@ def create_app():
     db.init_app(app)
 
     seed_on_start = os.getenv("APP_SEED_DATA", "0") == "1"
-    if app.config["TESTING"] or seed_on_start:
-        with app.app_context():
+    with app.app_context():
+        if app.config["TESTING"] or seed_on_start:
             # Elimina la base de datos si existe
             db.drop_all()
-            # Crea la base de datos
-            db.create_all()
+
+        # Crea las tablas si no existen (idempotente en prod).
+        db.create_all()
+
+        if app.config["TESTING"] or seed_on_start:
             # Inserta los datos de prueba
             for alumno in alumnos:
                 db.session.add(Alumno(**alumno))
