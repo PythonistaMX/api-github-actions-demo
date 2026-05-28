@@ -53,6 +53,7 @@ jobs:
 
           echo "version=$IMAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "rollout_tag=$ROLLOUT_TAG" >> "$GITHUB_OUTPUT"
+          echo "image_name_lower=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       # ── Autenticación ───────────────────────────────────────────────────────
       - name: Autenticar en GCP via OIDC
@@ -101,15 +102,14 @@ jobs:
           push: true
           tags: |
             ${{ vars.GCP_ARTIFACT_REGISTRY }}/${{ vars.GCP_CLOUD_RUN_SERVICE }}:${{ steps.version.outputs.version }}
-            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ steps.version.outputs.image_name_lower }}:${{ steps.version.outputs.version }}
 
       # ── Supply chain security ───────────────────────────────────────────────
       - name: Build immutable image reference
         if: github.event_name != 'workflow_dispatch'
         id: image_ref
         run: |
-          IMAGE_NAME_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_REF="ghcr.io/${IMAGE_NAME_LOWER}@${{ steps.build_and_push.outputs.digest }}"
+          IMAGE_REF="ghcr.io/${{ steps.version.outputs.image_name_lower }}@${{ steps.build_and_push.outputs.digest }}"
           echo "IMAGE_REF=$IMAGE_REF" >> "$GITHUB_ENV"
           echo "image_ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
 
