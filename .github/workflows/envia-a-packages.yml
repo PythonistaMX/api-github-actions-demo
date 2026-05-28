@@ -1,16 +1,20 @@
 name: Publish image to Packages
 
 on:
+  push:
+    tags:
+      # Solo prerelease: v1.2.3-rc.1, v1.2.3-beta.1
+      # Tags estables (v1.2.3) → despliega-cloud-run.yaml
+      - "v*.*.*-*"
   workflow_dispatch:
     inputs:
       target_environment:
-        description: "Entorno destino — solo para re-deploys de emergencia"
+        description: "Entorno destino"
         required: true
         default: test
         type: choice
         options:
           - test
-          - prod
 
 env:
   REGISTRY: ghcr.io
@@ -152,31 +156,4 @@ jobs:
           path: sbom.spdx.json
           if-no-files-found: error
 
-      - name: Autenticar en GCP via OIDC — solo prod
-        if: needs.resolve-env.outputs.target == 'prod'
-        id: gcp_auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
-        with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
-          token_format: access_token
-
-      - name: Login en Artifact Registry — solo prod
-        if: needs.resolve-env.outputs.target == 'prod'
-        uses: docker/login-action@04bf81902ca5d9c8e9f40ca42da112a7cb239165
-        with:
-          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.gcp_auth.outputs.access_token }}
-
-      - name: Publicar imagen en Artifact Registry — solo prod
-        if: needs.resolve-env.outputs.target == 'prod'
-        id: ar_push
-        run: |
-          IMAGE_NAME_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
-          GHCR_IMAGE="ghcr.io/${IMAGE_NAME_LOWER}:${{ github.ref_name }}"
-          AR_IMAGE="${{ vars.GCP_ARTIFACT_REGISTRY }}/${{ vars.GCP_CLOUD_RUN_SERVICE }}:${{ github.ref_name }}"
-          docker tag "$GHCR_IMAGE" "$AR_IMAGE"
-          docker push "$AR_IMAGE"
-          echo "image=$AR_IMAGE" >> "$GITHUB_OUTPUT"
 
