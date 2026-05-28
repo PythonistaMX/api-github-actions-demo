@@ -50,7 +50,6 @@ def crea_alumno(cuenta, json_data):
 @abc_alumnos.put("/alumno/<int:cuenta>")
 @abc_alumnos.output(AlumnoSchema)
 @abc_alumnos.input(AlumnoInSchema)
-@login_required
 def sustituye_alumno(cuenta, json_data):
     """Reemplaza todos los campos del alumno (semántica PUT completo, no PATCH parcial).
     Implementado como delete + insert para que SQLAlchemy valide el modelo completo."""
