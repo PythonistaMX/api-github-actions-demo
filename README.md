@@ -4,6 +4,22 @@ API REST para gestionar un catálogo de alumnos, construida con APIFlask y
 SQLAlchemy. Demuestra un pipeline CI/CD completo hacia GCP Cloud Run con
 calidad de código, seguridad de imagen y despliegue blue/green.
 
+## Cómo usar este repositorio
+
+**Como referencia de hardening CI/CD** — lee `SECURITY.md` y los archivos
+en `.github/workflows/` para ver una implementación real y funcional de:
+Workload Identity Federation, Trivy, Cosign, SBOM y despliegue blue/green
+con rollback automático. Sin necesidad de clonar ni desplegar.
+
+**Como punto de partida para una API Python con CI/CD** — clona el repo,
+adapta los modelos y endpoints en `apiflaskdemo/project/`, ajusta las
+variables de entorno y conecta tus propios entornos de GitHub Actions.
+La estructura de seguridad del pipeline está resuelta.
+
+**Como submódulo de otro proyecto** — inclúyelo con
+`git submodule add <url>` para reutilizar la app o los workflows en otro
+contexto sin duplicar código.
+
 ## Estructura del proyecto
 
 ```
