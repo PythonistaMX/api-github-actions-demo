@@ -184,10 +184,12 @@ jobs:
 
       - name: Obtener URL de la revisión candidata
         run: |
-          CANDIDATE_URL=$(gcloud run services describe ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
+          SERVICE_URL=$(gcloud run services describe ${{ vars.GCP_CLOUD_RUN_SERVICE }} \
             --region "${{ vars.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
-            --format "value(status.traffic[?tag=='${{ steps.version.outputs.rollout_tag }}'].url)")
+            --format "value(status.url)")
+          BASE="${SERVICE_URL#https://}"
+          CANDIDATE_URL="https://${{ steps.version.outputs.rollout_tag }}---${BASE}"
           echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
 
       - name: Smoke test — verificar respuesta HTTP 200
