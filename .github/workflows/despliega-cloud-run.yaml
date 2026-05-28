@@ -62,13 +62,13 @@ jobs:
         # Workload Identity Federation: GitHub Actions actúa como proveedor OIDC.
         # No se almacenan llaves JSON de service account en ningún secreto.
         # El binding en iam.tf restringe el acceso al repositorio y entorno exactos.
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
       - name: Configurar gcloud CLI
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Construir referencia de imagen
         # Usa la imagen publicada en GHCR por envia-a-packages.yml con el mismo git tag.
