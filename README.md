@@ -282,5 +282,3 @@ Environments sino que se fijan directamente en el YAML:
 | `APP_TESTING` | `"1"` | Activa el modo de prueba en Flask |
 | `APP_SEED_DATA` | `"1"` | Carga datos iniciales al arrancar |
 | `APP_ENV` | `test` / `prod` | Indica el entorno activo a la app |
-
-xx
