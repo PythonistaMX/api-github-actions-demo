@@ -74,7 +74,7 @@ jobs:
           exit-code: '1'
 
       - name: Log in to the Container registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        uses: docker/login-action@04bf81902ca5d9c8e9f40ca42da112a7cb239165
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -82,7 +82,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        uses: docker/metadata-action@17e943b6741018cb076d01088a79f7a301f67b15
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -95,7 +95,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build_and_push
-        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        uses: docker/build-push-action@473e09f9b5aedf66570255d5249136a73b8f2d86
         with:
           context: .
           push: true
@@ -210,7 +210,7 @@ jobs:
 
       - name: Login en Artifact Registry — solo prod
         if: needs.resolve-env.outputs.target == 'prod'
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        uses: docker/login-action@04bf81902ca5d9c8e9f40ca42da112a7cb239165
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
           username: oauth2accesstoken
