@@ -287,7 +287,7 @@ terraform -chdir=infra/terraform-py271 apply
 ## Configuración de rama protegida
 
 La combinación de rama protegida + checks obligatorios + CODEOWNERS sobre workflows
-es la base técnica del pipeline de este curso (NB03). Sin ella, las políticas de
+es la base técnica del pipeline de seguridad. Sin ella, las políticas de
 revisión son sugerencias que cualquier colaborador con acceso puede ignorar.
 
 Configurar en `Settings → Branches → Add ruleset` sobre la rama `main`:
@@ -319,8 +319,8 @@ Configurar en `Settings → Rules → New ruleset → Tag` sobre el patrón `v*.
 | Restrict deletions | Un tag de release no puede borrarse retroactivamente |
 | Block force pushes | Evita mover el tag a otro commit |
 
-Sin esta protección un tag es una referencia mutable — exactamente el riesgo
-descrito en el NB01 del curso.
+Sin esta protección un tag es una referencia mutable — un vector de ataque
+conocido en cadenas de suministro de software.
 
 ## Protección de archivos críticos (CODEOWNERS)
 
