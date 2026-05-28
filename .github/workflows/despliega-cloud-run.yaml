@@ -193,7 +193,7 @@ jobs:
       - name: Smoke test — verificar respuesta HTTP 200
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L \
-            -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+            -H "Authorization: Bearer $(gcloud auth print-identity-token --impersonate-service-account=${{ vars.GCP_SERVICE_ACCOUNT }})" \
             "$CANDIDATE_URL/api/alumnos/")
           echo "Smoke test status: $STATUS"
           if [ "$STATUS" != "200" ]; then
