@@ -1,5 +1,5 @@
 # Usamos tag versionado para evitar roturas por digests retirados y mantener
-# una base estable en la rama 3.11.
+# una base estable en la rama 3.14.
 FROM python:3.14-slim
 
 # Instala el binario de uv para gestionar dependencias de forma reproducible.
