@@ -65,14 +65,14 @@ jobs:
           token_format: access_token
 
       - name: Login en Artifact Registry
-        uses: docker/login-action@0267638d8ae53966df71bb06d552129dd542dfa7
+        uses: docker/login-action@946f94de75ea52995b6aa1e54fd3e0aeed6cc573
         with:
           registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
           username: oauth2accesstoken
           password: ${{ steps.gcp_auth.outputs.access_token }}
 
       - name: Login en GHCR
-        uses: docker/login-action@0267638d8ae53966df71bb06d552129dd542dfa7
+        uses: docker/login-action@946f94de75ea52995b6aa1e54fd3e0aeed6cc573
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -96,7 +96,7 @@ jobs:
       - name: Build y publicar imagen
         if: github.event_name != 'workflow_dispatch'
         id: build_and_push
-        uses: docker/build-push-action@7b93b2b85cab035420f0625ccc86452575bab2be
+        uses: docker/build-push-action@f72b3cf665d7d5fe435407befecb40d10b4266d2
         with:
           context: .
           push: true
