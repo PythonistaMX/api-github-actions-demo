@@ -46,7 +46,7 @@ jobs:
       APP_SECURITY_PASSWORD_SALT: ${{ secrets['APP_SECURITY_PASSWORD_SALT'] }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Lint Dockerfile
         # Falla temprano por malas practicas del Dockerfile.
