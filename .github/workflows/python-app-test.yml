@@ -36,7 +36,7 @@ jobs:
     steps:
     # Pinning por tag; para hardening máximo reemplazar con SHA:
     # actions/checkout@<sha> (obtener con: gh api repos/actions/checkout/git/ref/tags/v6)
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Instalar uv
       # Pinning por tag; para hardening máximo reemplazar con SHA:
