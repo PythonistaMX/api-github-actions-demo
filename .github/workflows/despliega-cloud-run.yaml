@@ -128,7 +128,7 @@ jobs:
 
       - name: Install Syft
         if: github.event_name != 'workflow_dispatch'
-        uses: anchore/sbom-action/download-syft@v0.24.0
+        uses: anchore/sbom-action/download-syft@v0.24.2
 
       - name: Install Cosign
         if: github.event_name != 'workflow_dispatch'
